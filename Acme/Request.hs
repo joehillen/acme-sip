@@ -108,7 +108,9 @@ parseHTTPVersion bs
     | bs == "HTTP/1.0" = HTTP10
     | otherwise        = throw (UnknownHTTPVersion bs)
 
-parseHeaders :: IO ByteString -> ByteString -> IO ([(ByteString, ByteString)], ByteString)
+parseHeaders :: IO ByteString
+             -> ByteString
+             -> IO ([(ByteString, ByteString)], ByteString)
 parseHeaders getChunk remainder =
     do (line, bs) <- takeLine getChunk remainder
        if B.null line

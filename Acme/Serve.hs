@@ -49,12 +49,17 @@ serveSocket :: Socket                             -- ^ 'Socket' in listen mode
             -> (Request -> IO Response) -- ^ request handler
             -> IO ()
 serveSocket listenSocket app =
-    forever $
-        do (sock, addr) <- accept listenSocket
-           let reader = recv sock 4096
-               writer = sendAll sock
-           forkIO $ do requestLoop False addr reader writer app `E.catch` (\ConnectionClosed -> return ())
-                       sClose sock
+    forever $ do
+        (sock, addr) <- accept listenSocket
+        let reader = recv sock 4096
+            writer = sendAll sock
+        forkIO $ do
+            requestLoop False
+                        addr
+                        reader
+                        writer
+                        app `E.catch` (\ConnectionClosed -> return ())
+            sClose sock
 
 requestLoop :: Bool
             -> SockAddr

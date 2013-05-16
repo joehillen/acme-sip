@@ -3,14 +3,17 @@ module Acme.Request where
 
 import Control.Monad.Trans             (lift, liftIO)
 import Control.Exception.Extensible
-import           Data.ByteString       (ByteString, elemIndex, empty, split, uncons)
+import           Data.ByteString       ( ByteString, elemIndex, empty, split
+                                       , uncons
+                                       )
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as C
 import Data.ByteString.Unsafe          (unsafeDrop, unsafeIndex, unsafeTake)
 import Data.Monoid                     (mappend)
 import Data.Typeable                   (Typeable)
-import Acme.Types                      ( ConnectionClosed(..), HTTPVersion(..), Method(..)
-                                       , Request(..), cr, colon, nl, space
+import Acme.Types                      ( ConnectionClosed(..), HTTPVersion(..)
+                                       , Method(..), Request(..), cr, colon
+                                       , nl, space
                                        )
 
 ------------------------------------------------------------------------------
@@ -55,7 +58,9 @@ parseRequest getChunk bs secure =
        return (request, bs'')
 
 {-
-The Request-Line begins with a method token, followed by the Request-URI and the protocol version, and ending with CRLF. The elements are separated by SP characters. No CR or LF is allowed except in the final CRLF sequence.
+The Request-Line begins with a method token, followed by the Request-URI and
+the protocol version, and ending with CRLF. The elements are separated by SP
+characters. No CR or LF is allowed except in the final CRLF sequence.
 
         Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
 -}
@@ -69,7 +74,8 @@ parseRequestLine bs =
 
 {-
 
-The Method token indicates the method to be performed on the resource identified by the Request-URI. The method is case-sensitive.
+The Method token indicates the method to be performed on the resource
+identified by the Request-URI. The method is case-sensitive.
 
        Method         = "OPTIONS"                ; Section 9.2
                       | "GET"                    ; Section 9.3
@@ -106,9 +112,9 @@ parseHeaders :: IO ByteString -> ByteString -> IO ([(ByteString, ByteString)], B
 parseHeaders getChunk remainder =
     do (line, bs) <- takeLine getChunk remainder
        if B.null line
-          then do return ([], bs)
+          then return ([], bs)
           else do (headers, bs') <- parseHeaders getChunk bs
-                  return ((parseHeader line : headers),  bs')
+                  return (((parseHeader line) : headers),  bs')
 
 
 {-
@@ -138,7 +144,7 @@ parseHeader bs =
 -}
 -- FIXME: follow the spec
 parseToken :: ByteString -> (ByteString, ByteString)
-parseToken bs = B.span (/= colon) bs
+parseToken = B.span (/= colon)
 
 -- | find a line terminated by a '\r\n'
 takeLine :: IO ByteString -> ByteString -> IO (ByteString, ByteString)
@@ -147,7 +153,7 @@ takeLine getChunk bs =
     case elemIndex nl bs of
       Nothing ->
            do x <- getChunk
-              if (B.null x)
+              if B.null x
                  then throw ConnectionClosed
                  else takeLine getChunk (bs `mappend` x)
       (Just 0) -> throw Unexpected
@@ -155,4 +161,4 @@ takeLine getChunk bs =
           -- check that the '\n' was preceded by '\r'
           if unsafeIndex bs (i - 1) /= cr
              then throw Unexpected
-             else return $ (unsafeTake (i - 1) bs, unsafeDrop (i + 1) bs)
+             else return (unsafeTake (i - 1) bs, unsafeDrop (i + 1) bs)

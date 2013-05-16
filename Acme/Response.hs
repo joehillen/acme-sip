@@ -12,12 +12,12 @@ import Prelude               hiding (concat)
 
 pong :: (ByteString -> IO ()) -> IO ()
 pong send =
-    do send "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nPONG"
+    send "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nPONG"
 
 sendResponse :: (ByteString -> IO ()) -> Response -> IO ()
 sendResponse send PongResponse = pong send
 sendResponse send ByteStringResponse{..} =
-    send $ concat (statusLine rsCode : (formatHeaders rsHeaders) ++ [rsBody])
+    send . concat $ statusLine rsCode : (formatHeaders rsHeaders) ++ [rsBody]
     where
       formatHeaders :: [(ByteString, ByteString)] -> [ByteString]
       formatHeaders         [] = ["\r\n"]
@@ -33,9 +33,9 @@ sendResponse send ByteStringResponse{..} =
 
 -- FIXME: can the http version always be 1.1 or do we need to match the caller?
 statusLine :: Int -> ByteString
-statusLine 200 = ok_status
+statusLine 200 = okStatus
 
-ok_status :: ByteString
-ok_status = "HTTP/1.1 200 OK\r\n"
+okStatus :: ByteString
+okStatus = "HTTP/1.1 200 OK\r\n"
 
 

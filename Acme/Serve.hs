@@ -4,14 +4,18 @@ import Acme.Request
 import Acme.Response
 import Acme.Types
 import Control.Concurrent (killThread, forkIO)
-import Control.Exception.Extensible             as E
-import Control.Monad (forever)
+import Control.Exception.Extensible as E
+import Control.Monad         (forever)
 import Control.Monad.Trans
-import Data.ByteString                          (ByteString, empty)
-import Data.ByteString.Char8                    (pack)
-import Network.BSD                              (getProtocolNumber)
-import Network.Socket                           (Socket, SockAddr(..), SocketOption(..), SocketType(Stream), Family(AF_INET), accept, bindSocket, iNADDR_ANY, sClose, listen, maxListenQueue, setSocketOption, socket)
-import Network.Socket.ByteString                (recv, sendAll)
+import Data.ByteString       (ByteString, empty)
+import Data.ByteString.Char8 (pack)
+import Network.BSD           (getProtocolNumber)
+import Network.Socket        ( Socket, SockAddr(..), SocketOption(..)
+                             , SocketType(Stream), Family(AF_INET)
+                             , accept, bindSocket, iNADDR_ANY, sClose, listen
+                             , maxListenQueue, setSocketOption, socket
+                             )
+import Network.Socket.ByteString    (recv, sendAll)
 import System.IO
 
 
@@ -23,7 +27,7 @@ listenOn portm = do
     proto <- getProtocolNumber "tcp"
     E.bracketOnError
         (socket AF_INET Stream proto)
-        (sClose)
+        sClose
         (\sock -> do
             setSocketOption sock ReuseAddr 1
             setSocketOption sock NoDelay 1
@@ -58,10 +62,9 @@ requestLoop :: Bool
             -> (ByteString -> IO ())
             -> (Request -> IO Response)
             -> IO ()
-requestLoop secure addr reader writer app =
-    go empty
+requestLoop secure addr reader writer app = go empty
     where
-      go bs =
-          do (request, bs') <- parseRequest reader bs secure
-             sendResponse writer =<< app request
-             go bs'
+        go bs = do
+            (request, bs') <- parseRequest reader bs secure
+            sendResponse writer =<< app request
+            go bs'

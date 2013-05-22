@@ -11,10 +11,11 @@ import qualified Data.ByteString.Char8 as C
 import Data.ByteString.Unsafe          (unsafeDrop, unsafeIndex, unsafeTake)
 import Data.Monoid                     (mappend)
 import Data.Typeable                   (Typeable)
-import Acme.Types                      ( ConnectionClosed(..), HTTPVersion(..)
+import Acme.Types                      ( ConnectionClosed(..), SIPVersion(..)
                                        , Method(..), Request(..), cr, colon
                                        , nl, space
                                        )
+import Data.List                       (find)
 
 ------------------------------------------------------------------------------
 -- Parse Exception
@@ -24,7 +25,8 @@ data ParseError
     = Unexpected
     | MalformedRequestLine ByteString
     | MalformedHeader      ByteString
-    | UnknownHTTPVersion   ByteString
+    | MissingHeader        ByteString
+    | UnknownSIPVersion    ByteString
       deriving (Typeable, Show, Eq)
 
 instance Exception ParseError
@@ -45,11 +47,17 @@ instance Exception ParseError
 parseRequest :: IO ByteString -> ByteString -> Bool -> IO (Request, ByteString)
 parseRequest getChunk bs secure =
     do (line, bs')     <- takeLine getChunk bs
-       let (method, requestURI, httpVersion) = parseRequestLine line
+       let (method, requestURI, sipVersion) = parseRequestLine line
        (headers, bs'') <- parseHeaders getChunk bs'
+       let toHeader = getHeader "To" headers
+       let callID = getHeader "Call-ID" headers
+       let cseq = getHeader "CSeq" headers
        let request = Request { rqMethod      = method
                              , rqURIbs       = requestURI
-                             , rqHTTPVersion = httpVersion
+                             , rqSIPVersion  = sipVersion
+                             , rqToHeader    = toHeader
+                             , rqCallID      = callID
+                             , rqCseq        = cseq
                              , rqHeaders     = headers
                              , rqSecure      = secure
                              , rqBody        = empty
@@ -57,18 +65,25 @@ parseRequest getChunk bs secure =
 --       liftIO $ print request
        return (request, bs'')
 
-{-
-The Request-Line begins with a method token, followed by the Request-URI and
-the protocol version, and ending with CRLF. The elements are separated by SP
-characters. No CR or LF is allowed except in the final CRLF sequence.
+getHeader name headers =
+    let header = find (\(k,v) -> k == name) headers
+    in case header of
+        Just (k, v) -> v
+        _           -> throw (MissingHeader name)
 
-        Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
+{-
+   The Request-Line ends with CRLF.  No CR or LF are allowed except in
+   the end-of-line CRLF sequence.  No linear whitespace (LWS) is allowed
+   in any of the elements.
+
+         Request-Line  =  Method SP Request-URI SP SIP-Version CRLF
+
 -}
-parseRequestLine :: ByteString -> (Method, ByteString, HTTPVersion)
+parseRequestLine :: ByteString -> (Method, ByteString, SIPVersion)
 parseRequestLine bs =
     case split space bs of
-      [method, requestURI, httpVersion] ->
-          (parseMethod method, requestURI, parseHTTPVersion httpVersion)
+      [method, requestURI, sipVersion] ->
+          (parseMethod method, requestURI, parseSIPVersion sipVersion)
       _ -> throw (MalformedRequestLine bs)
 
 
@@ -77,36 +92,32 @@ parseRequestLine bs =
 The Method token indicates the method to be performed on the resource
 identified by the Request-URI. The method is case-sensitive.
 
-       Method         = "OPTIONS"                ; Section 9.2
-                      | "GET"                    ; Section 9.3
-                      | "HEAD"                   ; Section 9.4
-                      | "POST"                   ; Section 9.5
-                      | "PUT"                    ; Section 9.6
-                      | "DELETE"                 ; Section 9.7
-                      | "TRACE"                  ; Section 9.8
-                      | "CONNECT"                ; Section 9.9
-                      | extension-method
+       Method   = "INVITE"
+                | "ACK"
+                | "BYE"
+                | "CANCEL"
+                | "REGISTER"
+                | "OPTIONS"
+                | "INFO" -- [RFC2976]
+                | extension-method
        extension-method = token
 -}
 parseMethod :: ByteString -> Method
 parseMethod bs
-    | bs == "OPTIONS" = OPTIONS
-    | bs == "GET"     = GET
-    | bs == "HEAD"    = HEAD
-    | bs == "POST"    = POST
-    | bs == "PUT"     = PUT
-    | bs == "DELETE"  = DELETE
-    | bs == "TRACE"   = TRACE
-    | bs == "CONNECT" = CONNECT
-    | otherwise       = EXTENSION bs
+    | bs == "INVITE"   = INVITE
+    | bs == "ACK"      = ACK
+    | bs == "BYE"      = BYE
+    | bs == "CANCEL"   = CANCEL
+    | bs == "REGISTER" = REGISTER
+    | bs == "OPTIONS"  = OPTIONS
+    | bs == "INFO"     = INFO
+    | otherwise        = EXTENSION bs
 
 
---         HTTP-Version   = "HTTP" "/" 1*DIGIT "." 1*DIGIT
-parseHTTPVersion :: ByteString -> HTTPVersion
-parseHTTPVersion bs
-    | bs == "HTTP/1.1" = HTTP11
-    | bs == "HTTP/1.0" = HTTP10
-    | otherwise        = throw (UnknownHTTPVersion bs)
+parseSIPVersion :: ByteString -> SIPVersion
+parseSIPVersion bs
+    | bs == "SIP/2.0" = SIP20
+    | otherwise       = throw (UnknownSIPVersion bs)
 
 parseHeaders :: IO ByteString
              -> ByteString
@@ -115,8 +126,9 @@ parseHeaders getChunk remainder =
     do (line, bs) <- takeLine getChunk remainder
        if B.null line
           then return ([], bs)
-          else do (headers, bs') <- parseHeaders getChunk bs
-                  return (((parseHeader line) : headers),  bs')
+          else do
+            (headers, bs') <- parseHeaders getChunk bs
+            return (((parseHeader line) : headers),  bs')
 
 
 {-
@@ -158,9 +170,11 @@ takeLine getChunk bs =
               if B.null x
                  then throw ConnectionClosed
                  else takeLine getChunk (bs `mappend` x)
-      (Just 0) -> throw Unexpected
-      (Just i) ->
-          -- check that the '\n' was preceded by '\r'
-          if unsafeIndex bs (i - 1) /= cr
-             then throw Unexpected
-             else return (unsafeTake (i - 1) bs, unsafeDrop (i + 1) bs)
+      (Just 0) -> do
+        print "No newline found"
+        throw Unexpected
+      (Just i) -> return $
+         -- check if the '\n' was preceded by '\r'
+         if unsafeIndex bs (i - 1) == cr
+            then (unsafeTake (i - 1) bs, unsafeDrop (i + 1) bs)
+            else (unsafeTake i bs, unsafeDrop (i + 1) bs)

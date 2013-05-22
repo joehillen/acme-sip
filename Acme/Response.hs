@@ -12,7 +12,7 @@ import Prelude               hiding (concat)
 
 pong :: (ByteString -> IO ()) -> IO ()
 pong send =
-    send "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nPONG"
+    send "SIP/2.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nPONG"
 
 sendResponse :: (ByteString -> IO ()) -> Response -> IO ()
 sendResponse send PongResponse = pong send
@@ -28,14 +28,13 @@ sendResponse send ByteStringResponse{..} =
 ------------------------------------------------------------------------------
 
 {-
-  Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+  Status-Line = SIP-Version SP Status-Code SP Reason-Phrase CRLF
 -}
 
--- FIXME: can the http version always be 1.1 or do we need to match the caller?
 statusLine :: Int -> ByteString
 statusLine 200 = okStatus
 
 okStatus :: ByteString
-okStatus = "HTTP/1.1 200 OK\r\n"
+okStatus = "SIP/2.0 200 OK\r\n"
 
 

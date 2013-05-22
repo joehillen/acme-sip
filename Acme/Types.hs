@@ -10,45 +10,37 @@ import Text.PrettyPrint.HughesPJ       (Doc, ($$), (<+>), ($+$), (<>), char, nes
 import Data.Word                       (Word8)
 
 ------------------------------------------------------------------------------
--- HTTPVersion
+-- SIPVersion
 ------------------------------------------------------------------------------
+data SIPVersion = SIP20
 
-data HTTPVersion
-    = HTTP10
-    | HTTP11
-      deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-ppHTTPVersion :: HTTPVersion -> Doc
-ppHTTPVersion HTTP10 = text "HTTP/1.0"
-ppHTTPVersion HTTP11 = text "HTTP/1.1"
+ppSIPVersion :: Doc
+ppSIPVersion = text "SIP/2.0"
 
 ------------------------------------------------------------------------------
 -- Method
 ------------------------------------------------------------------------------
 
 data Method
-    = OPTIONS
-    | GET
-    | GETONLY
-    | HEAD
-    | POST
-    | PUT
-    | DELETE
-    | TRACE
-    | CONNECT
+    = INVITE
+    | ACK
+    | BYE
+    | CANCEL
+    | REGISTER
+    | OPTIONS
+    | INFO -- [RFC2976]
     | EXTENSION ByteString
-      deriving (Eq, Ord, Read, Show, Data, Typeable)
+    deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 ppMethod :: Method -> Doc
-ppMethod OPTIONS         = text "OPTIONS"
-ppMethod GET             = text "GET"
-ppMethod GETONLY         = text "GETONLY"
-ppMethod HEAD            = text "HEAD"
-ppMethod POST            = text "POST"
-ppMethod PUT             = text "PUT"
-ppMethod DELETE          = text "DELETE"
-ppMethod TRACE           = text "TRACE"
-ppMethod CONNECT         = text "CONNECT"
+ppMethod INVITE   = text "INVITE"
+ppMethod ACK      = text "ACK"
+ppMethod BYE      = text "BYE"
+ppMethod CANCEL   = text "CANCEL"
+ppMethod REGISTER = text "REGISTER"
+ppMethod OPTIONS  = text "OPTIONS"
+ppMethod INFO     = text "INFO"
 ppMethod (EXTENSION ext) = text (C.unpack ext)
 
 ------------------------------------------------------------------------------
@@ -58,7 +50,10 @@ ppMethod (EXTENSION ext) = text (C.unpack ext)
 data Request = Request
     { rqMethod      :: !Method
     , rqURIbs       :: !ByteString
-    , rqHTTPVersion :: !HTTPVersion
+    , rqSIPVersion  :: !SIPVersion
+    , rqToHeader    :: !ByteString
+    , rqCallID      :: !ByteString
+    , rqCseq        :: !ByteString
     , rqHeaders     :: ![(ByteString, ByteString)]
     , rqSecure      :: !Bool
     , rqBody        :: !ByteString
@@ -74,7 +69,10 @@ ppRequest Request{..} =
       nest 2 (
         vcat [ field "  rqMethod"      (ppMethod            rqMethod)
              , field ", rqURIbs"       (bytestring          rqURIbs)
-             , field ", rqHTTPVersion" (ppHTTPVersion       rqHTTPVersion)
+             , field ", rqSIPVersion"  ppSIPVersion
+             , field ", rqToHeader"    (text $ show         rqToHeader)
+             , field ", rqCallID"      (text $ show         rqCallID)
+             , field ", rqCseq"        (text $ show         rqCseq)
              , field ", rqHeaders"     (vcat $ map ppHeader rqHeaders)
              , field ", rqSecure"      (text $ show         rqSecure)
              ])        $+$
@@ -88,6 +86,7 @@ data Response
     = PongResponse               -- ^ return PONG in the request body
     | ByteStringResponse
       { rsCode    :: !Int
+
       , rsHeaders :: ![(ByteString, ByteString)]
       , rsBody    :: !ByteString
       }
@@ -130,7 +129,7 @@ field :: String -- ^ field name
       -> Doc
 field name doc = text name $$ nest 15 (char '=' <+> doc)
 
--- | pretty-print an HTTP header
+-- | pretty-print an SIP header
 ppHeader :: (ByteString, ByteString) -> Doc
 ppHeader (fieldName, fieldValue) =
     bytestring fieldName <> char ':' <> bytestring fieldValue

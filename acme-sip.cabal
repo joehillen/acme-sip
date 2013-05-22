@@ -1,4 +1,4 @@
-Name:                acme-http
+Name:                acme-sip
 Version:             0.2.1
 Synopsis:            fastest Haskell PONG server in the world
 Description:         winning the PONG benchmark at all costs
@@ -35,7 +35,7 @@ Executable pong
   Main-Is: Pong.hs
   GHC-Options: -threaded -O2
 
-Executable http-echo
+Executable sip-echo
   Main-Is: Echo.hs
   GHC-Options: -threaded -O2
 

@@ -11,9 +11,10 @@ import Data.ByteString       (ByteString, empty)
 import Data.ByteString.Char8 (pack)
 import Network.BSD           (getProtocolNumber)
 import Network.Socket        ( Socket, SockAddr(..), SocketOption(..)
-                             , SocketType(Stream), Family(AF_INET)
-                             , accept, bindSocket, iNADDR_ANY, sClose, listen
-                             , maxListenQueue, setSocketOption, socket
+                             , SocketType(Stream), SocketType(Datagram)
+                             , Family(AF_INET) , accept, bindSocket
+                             , iNADDR_ANY, sClose, listen, maxListenQueue
+                             , setSocketOption, socket
                              )
 import Network.Socket.ByteString    (recv, sendAll)
 import System.IO

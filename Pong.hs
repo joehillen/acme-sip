@@ -6,7 +6,7 @@ import Acme.Types
 import Data.ByteString.Char8 ()
 
 main :: IO ()
-main = serve 8000 pong
+main = serve 5060 pong
 
 pong :: Request -> IO Response
 pong r =

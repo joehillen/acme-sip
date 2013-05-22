@@ -16,15 +16,15 @@ import Network.Socket        ( Socket, SockAddr(..), SocketOption(..)
                              , iNADDR_ANY, sClose, listen, maxListenQueue
                              , setSocketOption, socket
                              )
-import Network.Socket.ByteString    (recv, sendAll)
+import Network.Socket.ByteString    (recvFrom, sendAll, sendAllTo)
 import System.IO
 
 
 
 -- | start TCP listening on a port
-listenOn :: Int  -- ^ port number
+listenTCP :: Int  -- ^ port number
          -> IO Socket
-listenOn portm = do
+listenTCP portm = do
     proto <- getProtocolNumber "tcp"
     E.bracketOnError
         (socket AF_INET Stream proto)
@@ -37,40 +37,52 @@ listenOn portm = do
             return sock
         )
 
+-- | start UDP listening on a port
+listenUDP :: Int  -- ^ port number
+         -> IO Socket
+listenUDP portm = do
+    proto <- getProtocolNumber "udp"
+    E.bracketOnError
+        (socket AF_INET Datagram proto)
+        sClose
+        (\sock -> do
+            setSocketOption sock ReuseAddr 1
+            bindSocket sock (SockAddrInet (fromIntegral portm) iNADDR_ANY)
+            return sock
+        )
+
 -- | listen on a port and handle 'Requests'
 serve ::  Int                                -- ^ port to listen on
       -> (Request -> IO Response)  -- ^ request handler
       -> IO ()
 serve port app =
-    bracket (listenOn port) sClose $ \listenSocket ->
+    bracket (listenUDP port) sClose $ \listenSocket ->
         serveSocket listenSocket app
 
 -- | handle 'Requests' from an already listening 'Socket'
 serveSocket :: Socket                             -- ^ 'Socket' in listen mode
             -> (Request -> IO Response) -- ^ request handler
             -> IO ()
-serveSocket listenSocket app =
+serveSocket sockUDP app =
     forever $ do
-        (sock, addr) <- accept listenSocket
-        let reader = recv sock 4096
-            writer = sendAll sock
-        forkIO $ do
-            requestLoop False
-                        addr
-                        reader
-                        writer
-                        app `E.catch` (\ConnectionClosed -> return ())
-            sClose sock
+        --(sock, addr) <- accept listenSocket
+        --let reader = recv sock 4096
+        let reader = recvFrom sockUDP 4096
+            writer = sendAllTo sockUDP
+        forkIO $ requestLoop False
+                    reader
+                    writer
+                    app `E.catch` (\ConnectionClosed -> return ())
 
-requestLoop :: Bool
-            -> SockAddr
-            -> IO ByteString
-            -> (ByteString -> IO ())
-            -> (Request -> IO Response)
-            -> IO ()
-requestLoop secure addr reader writer app = go empty
+--requestLoop :: Bool
+--            -> IO ByteString
+--            -> (ByteString -> IO ())
+--            -> (Request -> IO Response)
+--            -> IO ()
+requestLoop secure reader writer app = go empty
     where
         go bs = do
-            (request, bs') <- parseRequest reader bs secure
-            sendResponse writer =<< app request
+            (msg, addr) <- reader
+            (request, bs') <- parseRequest (return msg) bs secure
+            sendResponse (\bs -> writer bs addr) =<< app request
             go bs'

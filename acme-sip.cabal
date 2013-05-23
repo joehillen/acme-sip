@@ -1,20 +1,20 @@
 Name:                acme-sip
-Version:             0.2.1
-Synopsis:            fastest Haskell PONG server in the world
-Description:         winning the PONG benchmark at all costs
+Version:             0.1
+Synopsis:            fastest Haskell SIP echo server in the world
+Description:         winning the echo benchmark at all costs
 License:             BSD3
 License-file:        LICENSE
-Author:              Jeremy Shaw
-Maintainer:          jeremy@n-heptane.com
+Author:              Joe Hillenbrand
+Maintainer:          joehillen@gmail.com
 Copyright:           2012 Jeremy Shaw, SeeReason Partners LLC
-Homepage:            http://happstack.com
+Homepage:            https://github.com/joehillen/acme-sip
 Category:            Web
 Build-type:          Simple
 Cabal-version:       >=1.6
 
 source-repository head
-    type:     darcs
-    location: http://patch-tag.com/r/stepcut/acme-http
+    type:     git
+    location: https://github.com/joehillen/acme-sip.git
 
 Library
   Exposed-modules:   Acme.Response
@@ -27,13 +27,10 @@ Library
                      extensible-exceptions == 0.1.*,
                      mtl                   == 2.0.*,
                      network               >= 2.3 && <2.5,
-                     pretty                >= 1.0 && <1.2
+                     pretty                >= 1.0 && <1.2,
+                     hashtables            >= 1.1
 
   GHC-Options: -O2
-
-Executable pong
-  Main-Is: Pong.hs
-  GHC-Options: -threaded -O2
 
 Executable sip-echo
   Main-Is: Echo.hs

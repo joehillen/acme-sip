@@ -10,12 +10,7 @@ import Prelude               hiding (concat)
 -- send a response
 ------------------------------------------------------------------------------
 
-pong :: (ByteString -> IO ()) -> IO ()
-pong send =
-    send "SIP/2.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nPONG"
-
 sendResponse :: (ByteString -> IO ()) -> Response -> IO ()
-sendResponse send PongResponse = pong send
 sendResponse send ByteStringResponse{..} =
     send . concat $ statusLine rsCode : (formatHeaders rsHeaders) ++ [rsBody]
     where

@@ -13,9 +13,10 @@ import Data.Monoid                     (mappend)
 import Data.Typeable                   (Typeable)
 import Acme.Types                      ( ConnectionClosed(..), SIPVersion(..)
                                        , Method(..), Request(..), cr, colon
-                                       , nl, space
+                                       , nl, space, lstrip, Headers
                                        )
 import Data.List                       (find)
+import qualified Data.Map.Lazy         as M
 
 ------------------------------------------------------------------------------
 -- Parse Exception
@@ -65,11 +66,12 @@ parseRequest getChunk bs secure =
 --       liftIO $ print request
        return (request, bs'')
 
+getHeader :: ByteString -> Headers -> ByteString
 getHeader name headers =
-    let header = find (\(k,v) -> k == name) headers
+    let header = M.lookup name headers
     in case header of
-        Just (k, v) -> v
-        _           -> throw (MissingHeader name)
+        Just v -> v
+        _      -> throw (MissingHeader name)
 
 {-
    The Request-Line ends with CRLF.  No CR or LF are allowed except in
@@ -121,14 +123,15 @@ parseSIPVersion bs
 
 parseHeaders :: IO ByteString
              -> ByteString
-             -> IO ([(ByteString, ByteString)], ByteString)
+             -> IO (Headers, ByteString)
 parseHeaders getChunk remainder =
     do (line, bs) <- takeLine getChunk remainder
        if B.null line
-          then return ([], bs)
+          then return (M.empty, bs)
           else do
             (headers, bs') <- parseHeaders getChunk bs
-            return (((parseHeader line) : headers),  bs')
+            let (field, value) = parseHeader line
+            return ((M.insert field value headers),  bs')
 
 
 {-
@@ -144,7 +147,7 @@ parseHeader bs =
     let (fieldName, remaining) = parseToken bs
     in case uncons remaining of
          (Just (c, fieldValue))
-             | c == colon -> (fieldName, fieldValue)
+             | c == colon -> (fieldName, (lstrip fieldValue))
          _                -> throw (MalformedHeader bs)
 
 {-
@@ -176,5 +179,6 @@ takeLine getChunk bs =
       (Just i) -> return $
          -- check if the '\n' was preceded by '\r'
          if unsafeIndex bs (i - 1) == cr
+            -- if so, remove it
             then (unsafeTake (i - 1) bs, unsafeDrop (i + 1) bs)
             else (unsafeTake i bs, unsafeDrop (i + 1) bs)

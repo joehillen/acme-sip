@@ -8,6 +8,8 @@ import Data.ByteString.Internal        (c2w)
 import Data.Data                       (Data, Typeable)
 import Text.PrettyPrint.HughesPJ       (Doc, ($$), (<+>), ($+$), (<>), char, nest, text, vcat)
 import Data.Word                       (Word8)
+import qualified Data.Map.Lazy         as M
+import Data.Char                       (isSpace)
 
 ------------------------------------------------------------------------------
 -- SIPVersion
@@ -47,6 +49,8 @@ ppMethod (EXTENSION ext) = text (C.unpack ext)
 -- Request
 ------------------------------------------------------------------------------
 
+type Headers = M.Map ByteString ByteString
+
 data Request = Request
     { rqMethod      :: !Method
     , rqURIbs       :: !ByteString
@@ -54,7 +58,7 @@ data Request = Request
     , rqToHeader    :: !ByteString
     , rqCallID      :: !ByteString
     , rqCseq        :: !ByteString
-    , rqHeaders     :: ![(ByteString, ByteString)]
+    , rqHeaders     :: !Headers
     , rqSecure      :: !Bool
     , rqBody        :: !ByteString
     }
@@ -67,14 +71,14 @@ ppRequest :: Request -> Doc
 ppRequest Request{..} =
     text "Request {"  $+$
       nest 2 (
-        vcat [ field "  rqMethod"      (ppMethod            rqMethod)
-             , field ", rqURIbs"       (bytestring          rqURIbs)
+        vcat [ field "  rqMethod"      (ppMethod    rqMethod)
+             , field ", rqURIbs"       (bytestring  rqURIbs)
              , field ", rqSIPVersion"  ppSIPVersion
-             , field ", rqToHeader"    (text $ show         rqToHeader)
-             , field ", rqCallID"      (text $ show         rqCallID)
-             , field ", rqCseq"        (text $ show         rqCseq)
-             , field ", rqHeaders"     (vcat $ map ppHeader rqHeaders)
-             , field ", rqSecure"      (text $ show         rqSecure)
+             , field ", rqToHeader"    (bytestring  rqToHeader)
+             , field ", rqCallID"      (bytestring  rqCallID)
+             , field ", rqCseq"        (bytestring  rqCseq)
+             , field ", rqHeaders"     (ppHeaders   rqHeaders)
+             , field ", rqSecure"      (text $ show rqSecure)
              ])        $+$
     text "}"
 
@@ -132,8 +136,15 @@ field name doc = text name $$ nest 15 (char '=' <+> doc)
 -- | pretty-print an SIP header
 ppHeader :: (ByteString, ByteString) -> Doc
 ppHeader (fieldName, fieldValue) =
-    bytestring fieldName <> char ':' <> bytestring fieldValue
+    bytestring fieldName <> text ": " <> bytestring fieldValue
 
+-- | pretty-print SIP headers
+ppHeaders :: Headers
+          -> Doc
+ppHeaders headers = vcat $ map ppHeader $ M.toList headers
+
+lstrip :: ByteString -> ByteString
+lstrip = C.dropWhile isSpace
 
 ------------------------------------------------------------------------------
 -- 'Word8' constants for popular characters

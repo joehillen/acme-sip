@@ -28,7 +28,7 @@ Library
                      mtl                   == 2.0.*,
                      network               >= 2.3 && <2.5,
                      pretty                >= 1.0 && <1.2,
-                     hashtables            >= 1.1
+                     containers            >= 0.5.2.1
 
   GHC-Options: -O2
 

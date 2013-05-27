@@ -14,6 +14,7 @@ echo r = do
     let body = pack $ show r -- note: this only works correctly for ascii, but I did not want to add a depends on utf8-string
     return ByteStringResponse
         { rsCode    = 200
+        , rsStatus  = "OK"
         , rsHeaders = [ ("To"            , rqToHeader r)
                       , ("Call-ID"       , rqCallID   r)
                       , ("Cseq"          , rqCseq     r)

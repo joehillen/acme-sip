@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, RankNTypes, RecordWildCards #-}
 module Acme.Types where
 
-import Control.Exception.Extensible    (Exception)
 import           Data.ByteString       (ByteString)
 import qualified Data.ByteString.Char8 as C
 import Data.ByteString.Internal        (c2w)
@@ -90,7 +89,7 @@ data Response
     = PongResponse               -- ^ return PONG in the request body
     | ByteStringResponse
       { rsCode    :: !Int
-
+      , rsStatus  :: !ByteString
       , rsHeaders :: ![(ByteString, ByteString)]
       , rsBody    :: !ByteString
       }
@@ -100,24 +99,14 @@ ppResponse PongResponse = text "PongResponse"
 ppResponse ByteStringResponse{..} =
     text "Response {"  $+$
       nest 2 (vcat [ field "rsCode"    (text $ show rsCode)
-                   , field "rsHeaders" (text $ show rsCode)
+                   , field "rsStatus"  (bytestring rsStatus)
+                   , field "rsHeaders" (ppHeaders (M.fromList rsHeaders))
                    , field "rsBody"    (text $ show rsBody)
                    ])  $+$
     text "}"
 
 instance Show Response where
     show = show . ppResponse
-
-------------------------------------------------------------------------------
--- Exceptions
-------------------------------------------------------------------------------
-
--- | thrown when the remote-side closes the connection
-data ConnectionClosed
-    = ConnectionClosed
-      deriving (Typeable, Show)
-
-instance Exception ConnectionClosed
 
 ------------------------------------------------------------------------------
 -- pretty-print helpers
@@ -133,7 +122,7 @@ field :: String -- ^ field name
       -> Doc
 field name doc = text name $$ nest 15 (char '=' <+> doc)
 
--- | pretty-print an SIP header
+-- | pretty-print a SIP header
 ppHeader :: (ByteString, ByteString) -> Doc
 ppHeader (fieldName, fieldValue) =
     bytestring fieldName <> text ": " <> bytestring fieldValue

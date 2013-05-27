@@ -11,26 +11,12 @@ import qualified Data.ByteString.Char8 as C
 import Data.ByteString.Unsafe          (unsafeDrop, unsafeIndex, unsafeTake)
 import Data.Monoid                     (mappend)
 import Data.Typeable                   (Typeable)
-import Acme.Types                      ( ConnectionClosed(..), SIPVersion(..)
+import Acme.Types                      ( SIPVersion(..)
                                        , Method(..), Request(..), cr, colon
                                        , nl, space, lstrip, Headers
                                        )
-import Data.List                       (find)
+import Acme.Error
 import qualified Data.Map.Lazy         as M
-
-------------------------------------------------------------------------------
--- Parse Exception
-------------------------------------------------------------------------------
-
-data ParseError
-    = Unexpected
-    | MalformedRequestLine ByteString
-    | MalformedHeader      ByteString
-    | MissingHeader        ByteString
-    | UnknownSIPVersion    ByteString
-      deriving (Typeable, Show, Eq)
-
-instance Exception ParseError
 
 ------------------------------------------------------------------------------
 -- Request Parser
@@ -50,8 +36,8 @@ parseRequest getChunk bs secure =
     do (line, bs')     <- takeLine getChunk bs
        let (method, requestURI, sipVersion) = parseRequestLine line
        (headers, bs'') <- parseHeaders getChunk bs'
-       let toHeader = getHeader "To" headers
        let callID = getHeader "Call-ID" headers
+       let toHeader = getHeader "To" headers
        let cseq = getHeader "CSeq" headers
        let request = Request { rqMethod      = method
                              , rqURIbs       = requestURI
@@ -71,7 +57,7 @@ getHeader name headers =
     let header = M.lookup name headers
     in case header of
         Just v -> v
-        _      -> throw (MissingHeader name)
+        _      -> throw (MissingHeader name headers)
 
 {-
    The Request-Line ends with CRLF.  No CR or LF are allowed except in

@@ -3,7 +3,9 @@ module Acme.Serve where
 import Acme.Request
 import Acme.Response
 import Acme.Types
+import Acme.Error
 import Control.Concurrent (killThread, forkIO)
+import Control.Exception     (try)
 import Control.Exception.Extensible as E
 import Control.Monad         (forever)
 import Control.Monad.Trans
@@ -97,9 +99,16 @@ requestLoopTCP :: Bool
 requestLoopTCP secure addr reader writer app = go empty
     where
         go bs = do
-            (request, bs') <- parseRequest reader bs secure
-            sendResponse writer =<< app request
-            go bs'
+           r <- try $ parseRequest reader bs secure
+           case r of
+             Left ex -> do
+                putStrLn "left"
+                exceptionHandler writer ex
+                go empty
+             Right (request, bs') -> do
+                sendResponse writer =<< app request
+                go bs'
+
 
 --requestLoop :: Bool
 --            -> IO ByteString
@@ -110,6 +119,7 @@ requestLoopUDP secure reader writer app = go empty
     where
         go bs = do
             (msg, addr) <- reader
+            let writer' bs = writer bs addr
             (request, bs') <- parseRequest (return msg) bs secure
-            sendResponse (\bs -> writer bs addr) =<< app request
+            sendResponse writer' =<< app request
             go bs'

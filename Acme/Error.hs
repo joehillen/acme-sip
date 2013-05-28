@@ -47,6 +47,9 @@ errorResponse code msg headers =
       , rsBody    = empty
       }
 
+exceptionHandler :: (ByteString -> IO ())
+                 -> ParseError
+                 -> IO ()
 exceptionHandler writer error = do
     let (msg, headers) =
          case error of

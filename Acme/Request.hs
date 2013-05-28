@@ -36,9 +36,9 @@ parseRequest getChunk bs secure =
     do (line, bs')     <- takeLine getChunk bs
        let (method, requestURI, sipVersion) = parseRequestLine line
        (headers, bs'') <- parseHeaders getChunk bs'
-       let callID = getHeader "Call-ID" headers
-       let toHeader = getHeader "To" headers
-       let cseq = getHeader "CSeq" headers
+       callID <- getHeader "Call-ID" headers
+       toHeader <- getHeader "To" headers
+       cseq <- getHeader "CSeq" headers
        let request = Request { rqMethod      = method
                              , rqURIbs       = requestURI
                              , rqSIPVersion  = sipVersion
@@ -52,12 +52,12 @@ parseRequest getChunk bs secure =
 --       liftIO $ print request
        return (request, bs'')
 
-getHeader :: ByteString -> Headers -> ByteString
-getHeader name headers =
+getHeader :: ByteString -> Headers -> IO ByteString
+getHeader name headers = do
     let header = M.lookup name headers
-    in case header of
-        Just v -> v
-        _      -> throw (MissingHeader name headers)
+    case header of
+        Just v -> return v
+        _      -> throwIO (MissingHeader name headers)
 
 {-
    The Request-Line ends with CRLF.  No CR or LF are allowed except in
